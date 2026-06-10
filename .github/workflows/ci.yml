@@ -1,0 +1,85 @@
+name: CI — Build & Lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # ── Job 1: Backend ─────────────────────────────────────────────────
+  backend-check:
+    name: Backend — install & syntax check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: forever-full-stack/backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: forever-full-stack/backend
+        run: npm install
+
+      - name: Syntax check (node --check)
+        working-directory: forever-full-stack/backend
+        run: node --check server.js
+
+  # ── Job 2: Frontend ────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend — lint & build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: forever-full-stack/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: forever-full-stack/frontend
+        run: npm install
+
+      - name: Build frontend (Vite)
+        working-directory: forever-full-stack/frontend
+        env:
+          VITE_BACKEND_URL: http://localhost:4000
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: npm run build
+
+  # ── Job 3: Admin ───────────────────────────────────────────────────
+  admin-build:
+    name: Admin — lint & build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: forever-full-stack/admin/package-lock.json
+
+      - name: Install admin dependencies
+        working-directory: forever-full-stack/admin
+        run: npm install
+
+      - name: Build admin panel (Vite)
+        working-directory: forever-full-stack/admin
+        env:
+          VITE_BACKEND_URL: http://localhost:4000
+        run: npm run build

@@ -1,0 +1,112 @@
+name: CD — Deploy to AWS
+
+# Only runs after CI passes on main/master
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  deploy:
+    name: Build images → push to ECR → deploy ECS
+    runs-on: ubuntu-latest
+
+    # This job only runs if all 3 CI jobs pass
+    needs: []   # Remove this line after adding ci.yml job references
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. AWS Auth ───────────────────────────────────────────────
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1   # Mumbai — closest to Jammu & Kashmir
+
+      # ── 3. Login to ECR ───────────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── 4. Build & Push BACKEND image ────────────────────────────
+      - name: Build and push backend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: fullfashion-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+                       -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+                       ./forever-full-stack/backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # ── 5. Build & Push FRONTEND image ───────────────────────────
+      - name: Build and push frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: fullfashion-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg VITE_BACKEND_URL=${{ secrets.VITE_BACKEND_URL }} \
+            --build-arg VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            ./forever-full-stack/frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # ── 6. Build & Push ADMIN image ───────────────────────────────
+      - name: Build and push admin image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: fullfashion-admin
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg VITE_BACKEND_URL=${{ secrets.VITE_BACKEND_URL }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            ./forever-full-stack/admin
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # ── 7. Deploy BACKEND to ECS ──────────────────────────────────
+      - name: Deploy backend to ECS
+        run: |
+          aws ecs update-service \
+            --cluster fullfashion-cluster \
+            --service fullfashion-backend-service \
+            --force-new-deployment \
+            --region ap-south-1
+
+      # ── 8. Deploy FRONTEND to ECS ─────────────────────────────────
+      - name: Deploy frontend to ECS
+        run: |
+          aws ecs update-service \
+            --cluster fullfashion-cluster \
+            --service fullfashion-frontend-service \
+            --force-new-deployment \
+            --region ap-south-1
+
+      # ── 9. Deploy ADMIN to ECS ────────────────────────────────────
+      - name: Deploy admin to ECS
+        run: |
+          aws ecs update-service \
+            --cluster fullfashion-cluster \
+            --service fullfashion-admin-service \
+            --force-new-deployment \
+            --region ap-south-1
+
+      # ── 10. Confirm deployment ────────────────────────────────────
+      - name: Wait for backend service to be stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster fullfashion-cluster \
+            --services fullfashion-backend-service \
+            --region ap-south-1
+          echo "Deployment complete!"
