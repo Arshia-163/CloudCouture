@@ -14,7 +14,7 @@ import path from 'path'
 
 // App Config
 const app = express()
-const port = process.env.PORT || 4000
+const port = process.env.PORT || 5000
 const CLIENT_ORIGIN = process.env.CLIENT_URL || 'http://localhost:5173'
 connectDB()
 connectCloudinary()
