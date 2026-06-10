@@ -21,16 +21,15 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Show repo structure (debug)
+        run: find . -maxdepth 3 -name "package.json" | grep -v node_modules
+
       - name: Install backend dependencies
-        working-directory: forever-full-stack/backend
+        working-directory: backend
         run: npm install
 
-      - name: Generate package-lock.json for future caching
-        working-directory: forever-full-stack/backend
-        run: npm install --package-lock-only --ignore-scripts 2>/dev/null || true
-
       - name: Syntax check (node --check)
-        working-directory: forever-full-stack/backend
+        working-directory: backend
         run: node --check server.js
 
   # ── Job 2: Frontend ────────────────────────────────────────────────
@@ -48,11 +47,11 @@ jobs:
           node-version: '18'
 
       - name: Install frontend dependencies
-        working-directory: forever-full-stack/frontend
+        working-directory: frontend
         run: npm install
 
       - name: Build frontend (Vite)
-        working-directory: forever-full-stack/frontend
+        working-directory: frontend
         env:
           VITE_BACKEND_URL: http://localhost:4000
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
@@ -73,11 +72,11 @@ jobs:
           node-version: '18'
 
       - name: Install admin dependencies
-        working-directory: forever-full-stack/admin
+        working-directory: admin
         run: npm install
 
       - name: Build admin panel (Vite)
-        working-directory: forever-full-stack/admin
+        working-directory: admin
         env:
           VITE_BACKEND_URL: http://localhost:4000
         run: npm run build
