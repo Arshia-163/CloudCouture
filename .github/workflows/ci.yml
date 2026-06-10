@@ -20,12 +20,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: forever-full-stack/backend/package-lock.json
 
       - name: Install backend dependencies
         working-directory: forever-full-stack/backend
         run: npm install
+
+      - name: Generate package-lock.json for future caching
+        working-directory: forever-full-stack/backend
+        run: npm install --package-lock-only --ignore-scripts 2>/dev/null || true
 
       - name: Syntax check (node --check)
         working-directory: forever-full-stack/backend
@@ -44,8 +46,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: forever-full-stack/frontend/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: forever-full-stack/frontend
@@ -71,8 +71,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: forever-full-stack/admin/package-lock.json
 
       - name: Install admin dependencies
         working-directory: forever-full-stack/admin
